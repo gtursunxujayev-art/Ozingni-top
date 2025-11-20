@@ -1,1 +1,1 @@
-# najotnur-suhbat
+# O'zingni-top
