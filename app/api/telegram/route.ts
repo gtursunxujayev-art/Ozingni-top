@@ -350,6 +350,15 @@ export async function POST(req: NextRequest) {
       user = await createNewUser(telegramId, username);
     }
 
+    // Extra safety: if still null, abort gracefully
+    if (!user) {
+      await sendTelegramMessage(
+        String(chatId),
+        'Serverda xatolik yuz berdi. Iltimos, keyinroq qayta urunib ko‘ring.'
+      );
+      return NextResponse.json({ ok: true });
+    }
+
     // Keep username fresh
     if (user.username !== username) {
       try {
