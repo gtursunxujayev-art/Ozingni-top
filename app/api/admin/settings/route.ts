@@ -23,7 +23,11 @@ export async function GET() {
       greetingText: settings.greetingText,
       askPhoneText: settings.askPhoneText,
       askJobText: settings.askJobText,
-      finalMessage: settings.finalMessage
+      finalMessage: settings.finalMessage,
+      questionsEnabled:
+        typeof settings.questionsEnabled === 'boolean'
+          ? settings.questionsEnabled
+          : true
     });
   } catch (err) {
     console.error('GET /api/admin/settings error:', err);
@@ -43,7 +47,14 @@ export async function POST(req: NextRequest) {
     let askJobText = (body.askJobText ?? '').toString().trim();
     let finalMessage = (body.finalMessage ?? '').toString().trim();
 
-    // Fallback default values
+    const questionsEnabledRaw = body.questionsEnabled;
+    const questionsEnabled =
+      typeof questionsEnabledRaw === 'boolean'
+        ? questionsEnabledRaw
+        : questionsEnabledRaw === 'false'
+        ? false
+        : true;
+
     if (!greetingText) {
       greetingText = 'Assalomu alaykum! Ismingizni kiriting:';
     }
@@ -56,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
     if (!finalMessage) {
       finalMessage =
-        "Siz Najot Nurning 21-noyabr kuni bo'lib o'tadigan biznes nonushta suhbat dasturi uchun ro'yhatdan o'tdingiz. Sizga to'liq ma'lumot uchun menejerlarimiz bog'lanishadi.";
+        "Rahmat! Siz ro'yxatdan o'tdingiz. Menejerlarimiz siz bilan bog'lanishadi.";
     }
 
     const updated = await prisma.botSettings.upsert({
@@ -65,13 +76,15 @@ export async function POST(req: NextRequest) {
         greetingText,
         askPhoneText,
         askJobText,
-        finalMessage
+        finalMessage,
+        questionsEnabled
       },
       create: {
         greetingText,
         askPhoneText,
         askJobText,
-        finalMessage
+        finalMessage,
+        questionsEnabled
       }
     });
 
@@ -79,7 +92,11 @@ export async function POST(req: NextRequest) {
       greetingText: updated.greetingText,
       askPhoneText: updated.askPhoneText,
       askJobText: updated.askJobText,
-      finalMessage: updated.finalMessage
+      finalMessage: updated.finalMessage,
+      questionsEnabled:
+        typeof updated.questionsEnabled === 'boolean'
+          ? updated.questionsEnabled
+          : true
     });
   } catch (err) {
     console.error('POST /api/admin/settings error:', err);
