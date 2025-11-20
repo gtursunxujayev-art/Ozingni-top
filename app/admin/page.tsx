@@ -16,135 +16,131 @@ type BotSettings = {
   askPhoneText: string;
   askJobText: string;
   finalMessage: string;
+  questionsEnabled: boolean;
 };
 
 export default function AdminPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-
   const [settings, setSettings] = useState<BotSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [broadcastText, setBroadcastText] = useState('');
 
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-
-  // Load users
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/users');
-      const data: User[] = await res.json();
-      setUsers(data);
-    } catch {
-      setError('Cannot load users');
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  // Load bot settings
-  const fetchSettings = async () => {
-    setSettingsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/settings');
-      const data: BotSettings = await res.json();
-      setSettings(data);
-    } catch {
-      setError('Cannot load bot messages settings');
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
+  // Load settings
   useEffect(() => {
-    fetchUsers();
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/admin/settings');
+        if (!res.ok) throw new Error('Failed to load settings');
+        const raw = await res.json();
+        const data: BotSettings = {
+          greetingText: raw.greetingText ?? '',
+          askPhoneText: raw.askPhoneText ?? '',
+          askJobText: raw.askJobText ?? '',
+          finalMessage: raw.finalMessage ?? '',
+          questionsEnabled:
+            typeof raw.questionsEnabled === 'boolean'
+              ? raw.questionsEnabled
+              : true
+        };
+        setSettings(data);
+      } catch (err) {
+        console.error(err);
+        alert('Bot sozlamalarini yuklashda xatolik.');
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
     fetchSettings();
   }, []);
 
-  const toggleSelect = (id: number) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const selectAll = () => {
-    if (selectedIds.length === users.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(users.map(u => u.id));
-    }
-  };
-
-  const handleSend = async () => {
-    if (!message.trim()) {
-      setError('Message text is empty');
-      return;
-    }
-    if (selectedIds.length === 0) {
-      setError('No users selected');
-      return;
-    }
-
-    setSending(true);
-    setError(null);
-    setInfo(null);
-
-    try {
-      const res = await fetch('/api/admin/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userIds: selectedIds, text: message })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Error sending messages');
-      } else {
-        setInfo(`Message sent to ${data.sent} user(s).`);
+  // Load users
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('/api/admin/users');
+        if (!res.ok) throw new Error('Failed to load users');
+        const data: User[] = await res.json();
+        setUsers(data);
+      } catch (err) {
+        console.error(err);
+        alert('Foydalanuvchilar roʻyxatini yuklashda xatolik.');
+      } finally {
+        setLoadingUsers(false);
       }
-    } catch {
-      setError('Error sending messages');
-    } finally {
-      setSending(false);
-    }
-  };
+    };
 
-  const handleExport = () => {
-    window.location.href = '/api/admin/export';
-  };
+    fetchUsers();
+  }, []);
 
   const handleSaveSettings = async () => {
     if (!settings) return;
-
-    setSettingsSaving(true);
-    setError(null);
-    setInfo(null);
-
+    setSavingSettings(true);
     try {
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Cannot save bot messages');
-      } else {
-        setSettings(data);
-        setInfo('Bot messages updated successfully.');
-      }
-    } catch {
-      setError('Cannot save bot messages');
+      if (!res.ok) throw new Error('Failed to save');
+      const updated = await res.json();
+      setSettings(updated);
+      alert('Sozlamalar saqlandi.');
+    } catch (err) {
+      console.error(err);
+      alert('Sozlamalarni saqlashda xatolik.');
     } finally {
-      setSettingsSaving(false);
+      setSavingSettings(false);
+    }
+  };
+
+  const toggleUserSelected = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === users.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(users.map((u) => u.id));
+    }
+  };
+
+  const handleSendToSelected = async () => {
+    if (!broadcastText.trim()) {
+      alert('Avval xabar matnini kiriting.');
+      return;
+    }
+    if (selectedIds.length === 0) {
+      alert('Hech bo‘lmasa bitta foydalanuvchini tanlang.');
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const res = await fetch('/api/admin/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userIds: selectedIds,
+          text: broadcastText.trim()
+        })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      const data = await res.json();
+      alert(`Xabar yuborildi. Jonatilganlar soni: ${data.sent ?? 0}`);
+      setBroadcastText('');
+    } catch (err) {
+      console.error(err);
+      alert('Xabar yuborishda xatolik.');
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -152,416 +148,423 @@ export default function AdminPage() {
     <main
       style={{
         minHeight: '100vh',
-        padding: '2rem',
-        background: '#f1f5f9'
+        background: '#020617',
+        color: '#e5e7eb',
+        padding: '24px'
       }}
     >
-      <div
-        style={{
-          maxWidth: '960px',
-          margin: '0 auto',
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.75rem',
-          boxShadow: '0 10px 25px rgba(15,23,42,0.08)'
-        }}
-      >
-        <h1 style={{ marginBottom: '0.5rem' }}>Admin panel</h1>
-        <p style={{ marginBottom: '1.5rem' }}>
-          Users list, CSV export, bulk messages and bot text settings.
-        </p>
-
-        {error && (
-          <div
-            style={{
-              marginBottom: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              background: '#fee2e2',
-              color: '#b91c1c'
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {info && (
-          <div
-            style={{
-              marginBottom: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              background: '#dcfce7',
-              color: '#166534'
-            }}
-          >
-            {info}
-          </div>
-        )}
-
-        {/* BOT MESSAGE SETTINGS */}
-        <section
+      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <header
           style={{
-            marginBottom: '1.5rem',
-            padding: '1rem',
-            borderRadius: '0.75rem',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc'
-          }}
-        >
-          <h2 style={{ marginBottom: '0.5rem' }}>Bot messages</h2>
-          <p
-            style={{
-              marginBottom: '0.75rem',
-              fontSize: '0.9rem',
-              color: '#475569'
-            }}
-          >
-            Bu yerda botning foydalanuvchiga yozadigan matnlarini o‘zgartirasiz.
-          </p>
-
-          {settingsLoading && !settings ? (
-            <p>Loading bot messages...</p>
-          ) : settings ? (
-            <>
-              {/* GREETING */}
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.9rem',
-                  marginBottom: '0.25rem'
-                }}
-              >
-                1. Birinchi xabar (ism so‘rash):
-              </label>
-              <textarea
-                value={settings.greetingText}
-                onChange={e =>
-                  setSettings(prev =>
-                    prev ? { ...prev, greetingText: e.target.value } : prev
-                  )
-                }
-                rows={2}
-                style={{
-                  width: '100%',
-                  borderRadius: '0.5rem',
-                  padding: '0.5rem',
-                  border: '1px solid #cbd5f5',
-                  marginBottom: '0.75rem'
-                }}
-              />
-
-              {/* PHONE */}
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.9rem',
-                  marginBottom: '0.25rem'
-                }}
-              >
-                2. Telefon raqamini so‘rash xabari:
-              </label>
-              <textarea
-                value={settings.askPhoneText}
-                onChange={e =>
-                  setSettings(prev =>
-                    prev ? { ...prev, askPhoneText: e.target.value } : prev
-                  )
-                }
-                rows={2}
-                style={{
-                  width: '100%',
-                  borderRadius: '0.5rem',
-                  padding: '0.5rem',
-                  border: '1px solid #cbd5f5',
-                  marginBottom: '0.75rem'
-                }}
-              />
-
-              {/* JOB */}
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.9rem',
-                  marginBottom: '0.25rem'
-                }}
-              >
-                3. Kasbini so‘rash xabari:
-              </label>
-              <textarea
-                value={settings.askJobText}
-                onChange={e =>
-                  setSettings(prev =>
-                    prev ? { ...prev, askJobText: e.target.value } : prev
-                  )
-                }
-                rows={2}
-                style={{
-                  width: '100%',
-                  borderRadius: '0.5rem',
-                  padding: '0.5rem',
-                  border: '1px solid #cbd5f5',
-                  marginBottom: '0.75rem'
-                }}
-              />
-
-              {/* FINAL MESSAGE */}
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '0.9rem',
-                  marginBottom: '0.25rem'
-                }}
-              >
-                4. Oxirgi xabar (ro‘yxatdan o‘tganidan keyin yuboriladi):
-              </label>
-              <textarea
-                value={settings.finalMessage}
-                onChange={e =>
-                  setSettings(prev =>
-                    prev ? { ...prev, finalMessage: e.target.value } : prev
-                  )
-                }
-                rows={3}
-                style={{
-                  width: '100%',
-                  borderRadius: '0.5rem',
-                  padding: '0.5rem',
-                  border: '1px solid #cbd5f5',
-                  marginBottom: '1rem'
-                }}
-              />
-
-              <button
-                onClick={handleSaveSettings}
-                disabled={settingsSaving}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                {settingsSaving ? 'Saving...' : 'Save bot messages'}
-              </button>
-            </>
-          ) : (
-            <p>Could not load bot settings.</p>
-          )}
-        </section>
-
-        {/* CONTROLS */}
-        <div
-          style={{
+            marginBottom: 24,
             display: 'flex',
-            gap: '0.75rem',
-            marginBottom: '1rem',
-            flexWrap: 'wrap'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}
         >
-          <button
-            onClick={fetchUsers}
-            disabled={loadingUsers}
+          <h1 style={{ fontSize: 24, fontWeight: 700 }}>
+            Najot Nur – Telegram Bot Admin
+          </h1>
+          <a
+            href="/api/admin/export"
             style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {loadingUsers ? 'Loading users...' : 'Reload users'}
-          </button>
-
-          <button
-            onClick={handleExport}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer'
+              padding: '8px 14px',
+              borderRadius: 9999,
+              border: '1px solid #38bdf8',
+              textDecoration: 'none',
+              fontSize: 14
             }}
           >
             Export CSV
-          </button>
+          </a>
+        </header>
 
-          <button
-            onClick={selectAll}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {selectedIds.length === users.length ? 'Unselect all' : 'Select all'}
-          </button>
-        </div>
+        {/* Settings */}
+        <section
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid #1f2937',
+            background: '#020617'
+          }}
+        >
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+            Bot xabarlari
+          </h2>
 
-        {/* SEND MESSAGE */}
-        <section style={{ marginBottom: '1.5rem' }}>
-          <h2 style={{ marginBottom: '0.5rem' }}>Send message</h2>
-          <textarea
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            rows={4}
-            placeholder="Write message for selected users..."
-            style={{
-              width: '100%',
-              borderRadius: '0.5rem',
-              padding: '0.5rem',
-              border: '1px solid #cbd5f5',
-              marginBottom: '0.75rem'
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={sending}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            {sending ? 'Sending...' : 'Send to selected'}
-          </button>
+          {loadingSettings && <p>Sozlamalar yuklanmoqda...</p>}
 
-          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-            Selected: {selectedIds.length} / {users.length}
-          </p>
-        </section>
-
-        {/* USERS TABLE */}
-        <section>
-          <h2 style={{ marginBottom: '0.5rem' }}>Users</h2>
-          {users.length === 0 ? (
-            <p>No users yet.</p>
-          ) : (
-            <div
-              style={{
-                maxHeight: '400px',
-                overflow: 'auto',
-                borderRadius: '0.5rem',
-                border: '1px solid #e2e8f0'
-              }}
-            >
-              <table
+          {!loadingSettings && settings && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Toggle questions */}
+              <div
                 style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '0.9rem'
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  marginBottom: 4
                 }}
               >
-                <thead
+                <label
                   style={{
-                    position: 'sticky',
-                    top: 0,
-                    background: '#e2e8f0',
-                    zIndex: 1
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 14
                   }}
                 >
-                  <tr>
-                    <th style={{ padding: '0.5rem' }}>
-                      <input
-                        type="checkbox"
-                        onChange={selectAll}
-                        checked={
-                          users.length > 0 &&
-                          selectedIds.length === users.length
-                        }
-                      />
-                    </th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>ID</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>
-                      Username
-                    </th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>
-                      Phone
-                    </th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>Job</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>
-                      Created
-                    </th>
-                  </tr>
-                </thead>
+                  <input
+                    type="checkbox"
+                    checked={settings.questionsEnabled}
+                    onChange={(e) =>
+                      setSettings((prev) =>
+                        prev
+                          ? { ...prev, questionsEnabled: e.target.checked }
+                          : prev
+                      )
+                    }
+                  />
+                  <span>
+                    Foydalanuvchidan{' '}
+                    <b>ism / telefon / kasb</b> so‘rashni yoqish / o‘chirish
+                  </span>
+                </label>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: '#9ca3af',
+                    marginLeft: 24
+                  }}
+                >
+                  Agar o‘chirilsa, bot savollar bermaydi – faqat foydalanuvchi
+                  username va Telegram ID sini bazaga yozib qo‘yadi.
+                </p>
+              </div>
 
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id}>
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'center',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(u.id)}
-                          onChange={() => toggleSelect(u.id)}
-                        />
-                      </td>
+              <label style={{ fontSize: 14 }}>
+                1. Birinchi xabar (ism so‘rash)
+                <textarea
+                  style={{
+                    marginTop: 4,
+                    width: '100%',
+                    minHeight: 60,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '1px solid #1f2937',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    fontSize: 14
+                  }}
+                  value={settings.greetingText}
+                  onChange={(e) =>
+                    setSettings((prev) =>
+                      prev ? { ...prev, greetingText: e.target.value } : prev
+                    )
+                  }
+                />
+              </label>
 
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {u.id}
-                      </td>
+              <label style={{ fontSize: 14 }}>
+                2. Telefon raqamini so‘rash xabari
+                <textarea
+                  style={{
+                    marginTop: 4,
+                    width: '100%',
+                    minHeight: 60,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '1px solid #1f2937',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    fontSize: 14
+                  }}
+                  value={settings.askPhoneText}
+                  onChange={(e) =>
+                    setSettings((prev) =>
+                      prev ? { ...prev, askPhoneText: e.target.value } : prev
+                    )
+                  }
+                />
+              </label>
 
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {u.name}
-                      </td>
+              <label style={{ fontSize: 14 }}>
+                3. Kasbini so‘rash xabari
+                <textarea
+                  style={{
+                    marginTop: 4,
+                    width: '100%',
+                    minHeight: 60,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '1px solid #1f2937',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    fontSize: 14
+                  }}
+                  value={settings.askJobText}
+                  onChange={(e) =>
+                    setSettings((prev) =>
+                      prev ? { ...prev, askJobText: e.target.value } : prev
+                    )
+                  }
+                />
+              </label>
 
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {u.username ? `@${u.username}` : '-'}
-                      </td>
+              <label style={{ fontSize: 14 }}>
+                4. Oxirgi xabar
+                <textarea
+                  style={{
+                    marginTop: 4,
+                    width: '100%',
+                    minHeight: 60,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '1px solid #1f2937',
+                    background: '#020617',
+                    color: '#e5e7eb',
+                    fontSize: 14
+                  }}
+                  value={settings.finalMessage}
+                  onChange={(e) =>
+                    setSettings((prev) =>
+                      prev ? { ...prev, finalMessage: e.target.value } : prev
+                    )
+                  }
+                />
+              </label>
 
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {u.phone}
-                      </td>
-
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {u.job}
-                      </td>
-
-                      <td
-                        style={{
-                          padding: '0.5rem',
-                          borderTop: '1px solid #e5e7eb'
-                        }}
-                      >
-                        {new Date(u.createdAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-
-              </table>
+              <button
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                style={{
+                  alignSelf: 'flex-start',
+                  marginTop: 4,
+                  padding: '8px 16px',
+                  borderRadius: 9999,
+                  border: 'none',
+                  background: '#22c55e',
+                  color: '#020617',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  opacity: savingSettings ? 0.7 : 1
+                }}
+              >
+                {savingSettings ? 'Saqlanmoqda...' : 'Sozlamalarni saqlash'}
+              </button>
             </div>
+          )}
+        </section>
+
+        {/* Users & targeted broadcast */}
+        <section
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid #1f2937',
+            background: '#020617'
+          }}
+        >
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+            Foydalanuvchilar
+          </h2>
+
+          {loadingUsers && <p>Foydalanuvchilar yuklanmoqda...</p>}
+
+          {!loadingUsers && (
+            <>
+              <div
+                style={{
+                  marginBottom: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>
+                    Tanlangan: {selectedIds.length} / {users.length}
+                  </span>
+                  <button
+                    onClick={handleSelectAll}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 9999,
+                      border: '1px solid #4b5563',
+                      background: 'transparent',
+                      color: '#e5e7eb',
+                      fontSize: 12,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {selectedIds.length === users.length
+                      ? 'Hammasini bekor qilish'
+                      : 'Hammasini tanlash'}
+                  </button>
+                </div>
+
+                <label style={{ fontSize: 14 }}>
+                  Tanlangan foydalanuvchilarga xabar
+                  <textarea
+                    style={{
+                      marginTop: 4,
+                      width: '100%',
+                      minHeight: 60,
+                      padding: 8,
+                      borderRadius: 8,
+                      border: '1px solid #1f2937',
+                      background: '#020617',
+                      color: '#e5e7eb',
+                      fontSize: 14
+                    }}
+                    value={broadcastText}
+                    onChange={(e) => setBroadcastText(e.target.value)}
+                    placeholder="Write message for selected users..."
+                  />
+                </label>
+
+                <button
+                  onClick={handleSendToSelected}
+                  disabled={sendingMessage}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '8px 16px',
+                    borderRadius: 9999,
+                    border: 'none',
+                    background: '#3b82f6',
+                    color: '#020617',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    opacity: sendingMessage ? 0.7 : 1
+                  }}
+                >
+                  {sendingMessage
+                    ? 'Yuborilmoqda...'
+                    : 'Tanlanganlarga xabar yuborish'}
+                </button>
+              </div>
+
+              <div
+                style={{
+                  maxHeight: 400,
+                  overflow: 'auto',
+                  borderRadius: 8,
+                  border: '1px solid #1f2937'
+                }}
+              >
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: 13
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        background: '#020617',
+                        position: 'sticky',
+                        top: 0
+                      }}
+                    >
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Tanlash
+                      </th>
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Ism
+                      </th>
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Username
+                      </th>
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Telefon
+                      </th>
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Kasb
+                      </th>
+                      <th
+                        style={{
+                          padding: 8,
+                          borderBottom: '1px solid #1f2937',
+                          textAlign: 'left'
+                        }}
+                      >
+                        Sana
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((u) => (
+                      <tr
+                        key={u.id}
+                        style={{
+                          borderBottom: '1px solid #0f172a',
+                          background: selectedIds.includes(u.id)
+                            ? '#020617'
+                            : 'transparent'
+                        }}
+                      >
+                        <td style={{ padding: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(u.id)}
+                            onChange={() => toggleUserSelected(u.id)}
+                          />
+                        </td>
+                        <td style={{ padding: 8 }}>{u.name}</td>
+                        <td style={{ padding: 8 }}>
+                          {u.username ? `@${u.username}` : ''}
+                        </td>
+                        <td style={{ padding: 8 }}>{u.phone}</td>
+                        <td style={{ padding: 8 }}>{u.job}</td>
+                        <td style={{ padding: 8 }}>
+                          {new Date(u.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
       </div>
