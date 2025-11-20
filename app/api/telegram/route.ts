@@ -73,8 +73,7 @@ export async function POST(req: NextRequest) {
 
     const chatId =
       message?.chat?.id !== undefined ? BigInt(message.chat.id) : null;
-    const fromId =
-      from?.id !== undefined ? BigInt(from.id) : null;
+    const fromId = from?.id !== undefined ? BigInt(from.id) : null;
 
     // Answer callback to stop "loading" on Telegram
     if (TELEGRAM_BOT_TOKEN && cq.id) {
@@ -103,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     if (!isAdmin) {
       await sendTelegramMessage(
-        chatId,
+        String(chatId),
         'Bu tugma faqat admin uchun moʻljallangan.'
       );
       return NextResponse.json({ ok: true });
@@ -114,7 +113,7 @@ export async function POST(req: NextRequest) {
     if (data === 'broadcast_yes') {
       if (!settings.broadcastFromChatId || !settings.broadcastMessageId) {
         await sendTelegramMessage(
-          chatId,
+          String(chatId),
           'Saqlangan xabar topilmadi. Qaytadan yuborib ko‘ring.'
         );
         return NextResponse.json({ ok: true });
@@ -123,7 +122,7 @@ export async function POST(req: NextRequest) {
       if (!TELEGRAM_BOT_TOKEN) {
         console.error('TELEGRAM_BOT_TOKEN missing, cannot broadcast');
         await sendTelegramMessage(
-          chatId,
+          String(chatId),
           'Server konfiguratsiyasida xatolik (bot token topilmadi).'
         );
         return NextResponse.json({ ok: true });
@@ -161,7 +160,7 @@ export async function POST(req: NextRequest) {
       });
 
       await sendTelegramMessage(
-        chatId,
+        String(chatId),
         `Xabar ${sent} ta foydalanuvchiga yuborildi.`
       );
       return NextResponse.json({ ok: true });
@@ -176,7 +175,7 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      await sendTelegramMessage(chatId, 'Xabar yuborish bekor qilindi.');
+      await sendTelegramMessage(String(chatId), 'Xabar yuborish bekor qilindi.');
       return NextResponse.json({ ok: true });
     }
 
@@ -232,7 +231,7 @@ export async function POST(req: NextRequest) {
         const msg =
           settings.finalMessage ||
           "Rahmat! Siz ro'yxatga olindingiz. Yangiliklar bo'yicha shu bot orqali xabar beramiz.";
-        await sendTelegramMessage(chatId, msg);
+        await sendTelegramMessage(String(chatId), msg);
         return NextResponse.json({ ok: true });
       }
 
@@ -263,7 +262,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      await sendTelegramMessage(chatId, settings.greetingText);
+      await sendTelegramMessage(String(chatId), settings.greetingText);
       return NextResponse.json({ ok: true });
     }
 
@@ -274,7 +273,7 @@ export async function POST(req: NextRequest) {
     if (isAdmin) {
       if (!TELEGRAM_BOT_TOKEN) {
         await sendTelegramMessage(
-          chatId,
+          String(chatId),
           'Bot token sozlanmagan. Admin broadcast ishlamaydi.'
         );
         return NextResponse.json({ ok: true });
@@ -313,7 +312,7 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error('sendMessage for admin keyboard error:', e);
         await sendTelegramMessage(
-          chatId,
+          String(chatId),
           'Inline tugmalarni yuborishda xatolik yuz berdi.'
         );
       }
@@ -365,7 +364,7 @@ export async function POST(req: NextRequest) {
 
     if (!textRaw) {
       await sendTelegramMessage(
-        chatId,
+        String(chatId),
         'Iltimos, faqat matn yuboring. Boshlash uchun /start yuboring.'
       );
       return NextResponse.json({ ok: true });
@@ -383,7 +382,7 @@ export async function POST(req: NextRequest) {
           }
         });
 
-        await sendTelegramMessage(chatId, settings.askPhoneText);
+        await sendTelegramMessage(String(chatId), settings.askPhoneText);
         break;
       }
 
@@ -396,7 +395,7 @@ export async function POST(req: NextRequest) {
           }
         });
 
-        await sendTelegramMessage(chatId, settings.askJobText);
+        await sendTelegramMessage(String(chatId), settings.askJobText);
         break;
       }
 
@@ -409,14 +408,14 @@ export async function POST(req: NextRequest) {
           }
         });
 
-        await sendTelegramMessage(chatId, settings.finalMessage);
+        await sendTelegramMessage(String(chatId), settings.finalMessage);
         break;
       }
 
       case 'DONE':
       default: {
         await sendTelegramMessage(
-          chatId,
+          String(chatId),
           "Siz allaqachon ro'yxatdan o'tgansiz. Ma'lumotlarni yangilash uchun /start yuborishingiz mumkin."
         );
         break;
@@ -430,7 +429,7 @@ export async function POST(req: NextRequest) {
     try {
       if (TELEGRAM_BOT_TOKEN && update?.message?.chat?.id) {
         await sendTelegramMessage(
-          BigInt(update.message.chat.id),
+          String(update.message.chat.id),
           'Serverda xatolik yuz berdi. Iltimos, keyinroq yana urinib ko‘ring.'
         );
       }
