@@ -18,9 +18,9 @@ model User {
   id         Int      @id @default(autoincrement())
   telegramId BigInt   @unique
   username   String?
-  name       String
-  phone      String
-  job        String
+  name       String   @default("")
+  phone      String   @default("")
+  job        String   @default("")
   step       Step     @default(ASK_NAME)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -31,7 +31,11 @@ model BotSettings {
   greetingText        String   @default("Assalomu alaykum! Ismingizni kiriting:")
   askPhoneText        String   @default("Telefon raqamingizni kiriting (masalan: +99890xxxxxxx):")
   askJobText          String   @default("Kasbingiz yoki nima ish qilishingizni yozing:")
-  finalMessage        String   @default("Siz Najot Nurning 21-noyabr kuni bo'lib o'tadigan biznes nonushta suhbat dasturi uchun ro'yhatdan o'tdingiz. Sizga to‘liq ma'lumot uchun menejerlarimiz bog‘lanishadi.")
+  finalMessage        String   @default("Rahmat! Siz roʻyxatdan oʻtdingiz. Menejerlarimiz siz bilan tez orada bogʻlanishadi.")
   broadcastFromChatId BigInt?
   broadcastMessageId  Int?
+
+  /// NEW: toggle – when false, bot does NOT ask questions,
+  /// it just collects username + telegramId
+  questionsEnabled    Boolean  @default(true)
 }
